@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FraudScope — Find what shouldn't be there</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="nav-brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">FraudScope</span>
+    </div>
+    <div class="nav-links">
+      <a href="#how">How it works</a>
+      <a href="#detect">Detection</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#app" class="nav-cta">Launch scan</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-inner">
+    <div class="hero-copy">
+      <p class="eyebrow"><span class="dot dot-live"></span> Runs on your data, not our servers</p>
+      <h1>Find what<br><span class="text-scan">shouldn't be there.</span></h1>
+      <p class="hero-sub">
+        Upload a ledger. FraudScope scans every row for the statistical
+        fingerprints of fraud — skewed digits, suspicious rounding,
+        duplicate transactions, threshold-skirting — and tells you exactly
+        which rows to look at, and why.
+      </p>
+      <div class="hero-actions">
+        <a href="#app" class="btn btn-primary">Scan a file <span class="arrow">→</span></a>
+        <a href="#how" class="btn btn-ghost">See how it works</a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat">
+          <span class="stat-num">7</span>
+          <span class="stat-label">detection methods</span>
+        </div>
+        <div class="stat">
+          <span class="stat-num">0</span>
+          <span class="stat-label">rows leave your machine*</span>
+        </div>
+        <div class="stat">
+          <span class="stat-num">100%</span>
+          <span class="stat-label">explainable flags</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="scan-panel">
+        <div class="scan-panel-head">
+          <span class="scan-panel-title">ledger_q3.csv</span>
+          <span class="scan-panel-status" id="scanStatus">scanning…</span>
+        </div>
+        <div class="scan-table" id="scanTable">
+          <!-- rows injected by JS -->
+        </div>
+        <div class="scan-beam" id="scanBeam"></div>
+      </div>
+      <div class="scan-summary">
+        <div class="summary-chip chip-red"><span></span>3 high risk</div>
+        <div class="summary-chip chip-amber"><span></span>5 medium risk</div>
+        <div class="summary-chip chip-green"><span></span>142 clear</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ HOW IT WORKS ============ -->
+<section class="section" id="how">
+  <p class="section-eyebrow">Process</p>
+  <h2 class="section-title">Three steps. No account. No upload to the cloud.</h2>
+  <div class="steps">
+    <div class="step">
+      <span class="step-index">Upload</span>
+      <h3>Drop in a CSV</h3>
+      <p>Transactions, expense logs, payment records — FraudScope auto-detects amount, date, ID, and vendor columns on its own.</p>
+    </div>
+    <div class="step">
+      <span class="step-index">Scan</span>
+      <h3>Seven checks run locally</h3>
+      <p>Every row is scored using statistical tests built for financial forensics — not a language model guessing at numbers.</p>
+    </div>
+    <div class="step">
+      <span class="step-index">Review</span>
+      <h3>Get a ranked, explained report</h3>
+      <p>Each flag comes with a plain-language reason and a risk score, exportable as a report you can hand to anyone.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DETECTION METHODS ============ -->
+<section class="section section-alt" id="detect">
+  <p class="section-eyebrow">Detection engine</p>
+  <h2 class="section-title">What FraudScope actually checks for</h2>
+  <div class="method-grid">
+    <div class="method-card">
+      <span class="method-tag">Digit pattern</span>
+      <h3>Benford's Law deviation</h3>
+      <p>Naturally occurring numbers follow a predictable first-digit distribution. Fabricated figures rarely do.</p>
+    </div>
+    <div class="method-card">
+      <span class="method-tag">Outliers</span>
+      <h3>Statistical anomalies</h3>
+      <p>Z-score and IQR analysis surface transactions that sit far outside the normal range for that account.</p>
+    </div>
+    <div class="method-card">
+      <span class="method-tag">Repetition</span>
+      <h3>Duplicate &amp; near-duplicate detection</h3>
+      <p>Catches the same transaction entered twice, or entered again with a slightly altered amount.</p>
+    </div>
+    <div class="method-card">
+      <span class="method-tag">Rounding</span>
+      <h3>Round-number bias</h3>
+      <p>Real transactions are messy. A cluster of suspiciously round figures is a known fabrication signal.</p>
+    </div>
+    <div class="method-card">
+      <span class="method-tag">Structuring</span>
+      <h3>Threshold-skirting</h3>
+      <p>Flags transactions clustered just under an approval limit — a classic sign of deliberate evasion.</p>
+    </div>
+    <div class="method-card">
+      <span class="method-tag">Timing</span>
+      <h3>Time-based anomalies</h3>
+      <p>Unusual activity outside business hours or in weekend bursts gets surfaced automatically.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PRIVACY ============ -->
+<section class="section" id="privacy">
+  <div class="privacy-block">
+    <div class="privacy-copy">
+      <p class="section-eyebrow">Privacy by design</p>
+      <h2 class="section-title">Your ledger never has to leave the room.</h2>
+      <p class="hero-sub">
+        Every detection method runs locally against your file. If you turn on
+        AI-written summaries, only anonymized, aggregated statistics are sent
+        out — never raw rows, names, or account numbers. Prefer nothing to
+        leave at all? Flip on Offline Mode and skip AI summaries entirely.
+      </p>
+    </div>
+    <div class="privacy-toggle-demo">
+      <div class="toggle-row">
+        <span>AI narrative summaries</span>
+        <div class="toggle toggle-on"><div class="toggle-dot"></div></div>
+      </div>
+      <div class="toggle-row">
+        <span>Offline mode</span>
+        <div class="toggle"><div class="toggle-dot"></div></div>
+      </div>
+      <p class="privacy-note">* Raw data is processed in memory and is never written to a remote database.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ APP ANCHOR (placeholder for now) ============ -->
+<section class="section section-alt" id="app">
+  <p class="section-eyebrow">Get started</p>
+  <h2 class="section-title">The scanner itself goes here next.</h2>
+  <p class="hero-sub" style="max-width:520px">This is where the upload + live report interface will live — we're building the landing page first, then wiring up the real engine underneath it.</p>
+</section>
+
+<footer class="footer">
+  <span>FraudScope</span>
+  <span class="footer-sep">·</span>
+  <span>Built for the ledgers that don't add up.</span>
+</footer>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
