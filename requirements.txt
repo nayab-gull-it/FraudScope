@@ -5,3 +5,4 @@ groq
 python-dotenv
 reportlab
 pandas-stubs
+gunicorn
