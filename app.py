@@ -105,3 +105,47 @@ def api_narrative():
 
     result = generate_narrative(summary, offline_mode=offline_mode)
     return jsonify(result)
+from engine.chatbot import chat_response
+
+@app.route("/api/chat", methods=["POST"])
+def api_chat():
+    data = request.get_json(silent=True) or {}
+
+    result = chat_response(
+        user_message=data.get("message", ""),
+        conversation_history=data.get("history", []),
+        summary=data.get("summary", {}),
+        rows=data.get("rows", []),
+        consent=bool(data.get("consent", False)),
+        offline_mode=bool(data.get("offline_mode", False)),
+    )
+    return jsonify(result)
+from engine.chatbot import chat_response
+
+@app.route("/api/chat", methods=["POST"])
+def api_chat():
+    data = request.get_json(silent=True) or {}
+
+    result = chat_response(
+        user_message=data.get("message", ""),
+        conversation_history=data.get("history", []),
+        summary=data.get("summary", {}),
+        rows=data.get("rows", []),
+        consent=bool(data.get("consent", False)),
+        offline_mode=bool(data.get("offline_mode", False)),
+    )
+    return jsonify(result)
+from io import BytesIO
+from flask import send_file
+from engine.report_export import generate_pdf_report
+
+@app.route("/api/export", methods=["POST"])
+def api_export():
+    scan_data = request.get_json(silent=True) or {}
+    pdf_buffer = generate_pdf_report(scan_data)
+    return send_file(
+        pdf_buffer,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name="fraudscope_report.pdf",
+    )
