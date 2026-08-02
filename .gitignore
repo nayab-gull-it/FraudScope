@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+env/
+.venv/
+
+# Environment variables / secrets — NEVER commit these
+.env
+.env.local
+*.key
+
+# Flask
+instance/
+.flaskenv
+
+# Uploaded/user data — real ledgers should never be committed
+uploads/
+*.csv
+!sample_data/*.csv
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

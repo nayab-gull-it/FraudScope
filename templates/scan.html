@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FraudScope — Scan a file</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/scan.css') }}">
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">FraudScope</span>
+    </a>
+    <div class="nav-links">
+      <a href="/#how">How it works</a>
+      <a href="/#detect">Detection</a>
+      <a href="/#privacy">Privacy</a>
+    </div>
+  </div>
+</nav>
+
+<main class="scan-page">
+
+  <!-- ============ STATE 1: UPLOAD ============ -->
+  <section class="upload-state" id="uploadState">
+    <p class="section-eyebrow" style="text-align:center">Get started</p>
+    <h1 class="scan-title">Drop in a ledger.<br>We'll do the rest.</h1>
+    <p class="hero-sub" style="margin:0 auto 40px; text-align:center">
+      CSV files only for now. Nothing is uploaded to a server — everything
+      runs right here in your browser session.
+    </p>
+
+    <div class="dropzone" id="dropzone">
+      <input type="file" id="fileInput" accept=".csv" hidden>
+      <div class="dropzone-icon">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M12 16V4M12 4L7 9M12 4l5 5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <p class="dropzone-title">Drag &amp; drop your CSV here</p>
+      <p class="dropzone-sub">or</p>
+      <button class="btn btn-primary" id="browseBtn" type="button">Browse files</button>
+      <p class="dropzone-filename" id="fileName"></p>
+    </div>
+
+    <div class="privacy-toggle-row">
+      <div class="toggle-row-inline">
+        <span>AI narrative summary</span>
+        <div class="toggle toggle-on" id="aiToggle"><div class="toggle-dot"></div></div>
+      </div>
+      <div class="toggle-row-inline">
+        <span>Offline mode (no external calls at all)</span>
+        <div class="toggle" id="offlineToggle"><div class="toggle-dot"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STATE 2: ANALYZING ============ -->
+  <section class="analyzing-state" id="analyzingState" hidden>
+    <div class="analyzing-panel">
+      <div class="analyzing-ring"></div>
+      <p class="analyzing-title" id="analyzingTitle"></p>
+      <p class="analyzing-sub" id="analyzingSub"></p>
+    </div>
+  </section>
+
+  <!-- ============ STATE 3: REPORT ============ -->
+  <section class="report-state" id="reportState" hidden>
+
+    <div class="report-header">
+      <div>
+        <p class="section-eyebrow">Scan complete</p>
+        <h1 class="scan-title" style="font-size:1.9rem" id="reportFileName"></h1>
+      </div>
+      <div class="report-actions">
+        <button class="btn btn-ghost" id="newScanBtn" type="button">Scan another file</button>
+        <button class="btn btn-primary" id="downloadBtn" type="button">Download report ↓</button>
+      </div>
+    </div>
+
+    <div class="summary-cards">
+      <div class="summary-card">
+        <span class="summary-num">150</span>
+        <span class="summary-label">rows scanned</span>
+      </div>
+      <div class="summary-card card-red">
+        <span class="summary-num">3</span>
+        <span class="summary-label">high risk</span>
+      </div>
+      <div class="summary-card card-amber">
+        <span class="summary-num">5</span>
+        <span class="summary-label">medium risk</span>
+      </div>
+      <div class="summary-card card-green">
+        <span class="summary-num">142</span>
+        <span class="summary-label">clear</span>
+      </div>
+    </div>
+
+    <div class="report-body">
+      <div class="report-main">
+        <div class="table-toolbar">
+          <div class="filter-tabs">
+            <button class="filter-tab active" data-filter="all">All <span>8</span></button>
+            <button class="filter-tab" data-filter="high">High risk <span>3</span></button>
+            <button class="filter-tab" data-filter="med">Medium risk <span>5</span></button>
+          </div>
+        </div>
+
+        <div class="report-table" id="reportTable">
+          <div class="report-table-head">
+            <span>ID</span>
+            <span>Vendor</span>
+            <span>Amount</span>
+            <span>Risk</span>
+            <span>Why it's flagged</span>
+          </div>
+          <!-- rows injected by JS -->
+        </div>
+      </div>
+
+      <aside class="report-side">
+        <div class="side-card">
+          <p class="side-card-title">AI summary</p>
+          <p class="side-card-text" id="aiSummaryText">
+            Three transactions were flagged for review. Two sit just under the
+            50,000 approval threshold — a pattern often used to avoid manager
+            sign-off. One is a duplicate charge from the same vendor recorded
+            twice within the same week.
+          </p>
+        </div>
+        <div class="side-card">
+          <p class="side-card-title">Methods that fired</p>
+          <ul class="method-list">
+            <li><span class="dot-red"></span> Threshold-skirting <span class="method-count">2</span></li>
+            <li><span class="dot-amber"></span> Duplicate detection <span class="method-count">1</span></li>
+            <li><span class="dot-amber"></span> Statistical outlier <span class="method-count">3</span></li>
+            <li><span class="dot-amber"></span> Round-number bias <span class="method-count">2</span></li>
+          </ul>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+</main>
+
+<script src="{{ url_for('static', filename='js/scan.js') }}"></script>
+</body>
+</html>

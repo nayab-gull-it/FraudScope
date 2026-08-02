@@ -1,0 +1,246 @@
+/* =========================================================
+   FraudScope — Scan page (upload, analyzing, report states)
+   Relies on design tokens defined in style.css
+   ========================================================= */
+
+.scan-page{
+  max-width:900px;
+  margin:0 auto;
+  padding:72px 32px 120px;
+  min-height:70vh;
+}
+
+/* ---------- shared ---------- */
+.scan-title{
+  font-family:var(--font-display);
+  font-weight:700;
+  font-size:clamp(1.9rem, 3.4vw, 2.6rem);
+  line-height:1.12;
+  letter-spacing:-0.02em;
+  text-align:center;
+  margin-bottom:14px;
+}
+
+/* =========================================================
+   STATE 1 — UPLOAD
+   ========================================================= */
+.dropzone{
+  position:relative;
+  display:flex; flex-direction:column; align-items:center;
+  gap:10px;
+  padding:64px 32px;
+  border:1.5px dashed var(--border);
+  border-radius:var(--radius-lg);
+  background:var(--bg-card);
+  text-align:center;
+  transition:border-color 0.2s ease, background 0.2s ease;
+  cursor:pointer;
+}
+.dropzone:hover, .dropzone.dragover{
+  border-color:var(--neon-cyan);
+  background:var(--bg-card-hover);
+}
+.dropzone-icon{ color:var(--neon-cyan); margin-bottom:6px; }
+.dropzone-title{ font-weight:500; font-size:1.02rem; }
+.dropzone-sub{ color:var(--text-faint); font-size:0.85rem; margin-bottom:4px; }
+.dropzone-filename{
+  margin-top:14px;
+  font-family:var(--font-mono);
+  font-size:0.82rem;
+  color:var(--neon-green);
+  min-height:1.2em;
+}
+
+.privacy-toggle-row{
+  display:flex; flex-direction:column; gap:0;
+  margin-top:28px;
+  border:1px solid var(--border-soft);
+  border-radius:var(--radius-md);
+  background:var(--bg-card);
+  padding:6px 22px;
+}
+.toggle-row-inline{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 0;
+  font-size:0.88rem;
+  color:var(--text-muted);
+}
+.toggle-row-inline:first-child{ border-bottom:1px solid var(--border-soft); }
+
+.toggle-disabled{
+  opacity:0.35;
+  cursor:not-allowed;
+  pointer-events:none;
+}
+
+/* =========================================================
+   STATE 2 — ANALYZING
+   ========================================================= */
+.analyzing-state{
+  display:flex; align-items:center; justify-content:center;
+  min-height:50vh;
+}
+.analyzing-panel{ text-align:center; }
+.analyzing-ring{
+  width:64px; height:64px;
+  margin:0 auto 28px;
+  border-radius:50%;
+  border:3px solid var(--border);
+  border-top-color:var(--neon-cyan);
+  animation:spin 0.9s linear infinite;
+}
+@keyframes spin{ to{ transform:rotate(360deg); } }
+.analyzing-title{
+  font-family:var(--font-display);
+  font-size:1.15rem; font-weight:600;
+  margin-bottom:8px;
+}
+.analyzing-sub{
+  font-family:var(--font-mono);
+  font-size:0.82rem;
+  color:var(--text-faint);
+}
+
+/* =========================================================
+   STATE 3 — REPORT
+   ========================================================= */
+.report-state{ max-width:1080px; margin:0 auto; }
+
+.report-header{
+  display:flex; align-items:flex-end; justify-content:space-between;
+  gap:20px; flex-wrap:wrap;
+  margin-bottom:36px;
+}
+.report-header .scan-title{ text-align:left; margin-bottom:0; }
+.report-actions{ display:flex; gap:12px; }
+
+.summary-cards{
+  display:grid; grid-template-columns:repeat(4,1fr);
+  gap:16px;
+  margin-bottom:36px;
+}
+.summary-card{
+  padding:22px 20px;
+  border:1px solid var(--border-soft);
+  border-radius:var(--radius-md);
+  background:var(--bg-card);
+  display:flex; flex-direction:column; gap:6px;
+}
+.summary-num{ font-family:var(--font-mono); font-size:1.7rem; font-weight:600; }
+.summary-label{ font-size:0.8rem; color:var(--text-faint); }
+.card-red .summary-num{ color:var(--neon-red); }
+.card-amber .summary-num{ color:var(--neon-amber); }
+.card-green .summary-num{ color:var(--neon-green); }
+
+.report-body{
+  display:grid; grid-template-columns:1fr 300px;
+  gap:24px;
+  align-items:start;
+}
+
+/* ---------- table toolbar / filters ---------- */
+.table-toolbar{ margin-bottom:14px; }
+.filter-tabs{ display:flex; gap:8px; }
+.filter-tab{
+  font-family:var(--font-mono); font-size:0.78rem;
+  color:var(--text-muted);
+  background:var(--bg-card);
+  border:1px solid var(--border-soft);
+  border-radius:100px;
+  padding:8px 14px;
+  cursor:pointer;
+  transition:border-color 0.2s ease, color 0.2s ease;
+}
+.filter-tab span{ color:var(--text-faint); margin-left:4px; }
+.filter-tab:hover{ border-color:var(--text-muted); }
+.filter-tab.active{ border-color:var(--neon-cyan); color:var(--neon-cyan); }
+.filter-tab.active span{ color:var(--neon-cyan); }
+
+/* ---------- report table ---------- */
+.report-table{
+  border:1px solid var(--border-soft);
+  border-radius:var(--radius-md);
+  overflow:hidden;
+  background:var(--bg-card);
+}
+.report-table-head{
+  display:grid;
+  grid-template-columns:90px 1fr 100px 90px 1.4fr;
+  gap:12px;
+  padding:12px 18px;
+  font-family:var(--font-mono);
+  font-size:0.7rem;
+  text-transform:uppercase;
+  letter-spacing:0.04em;
+  color:var(--text-faint);
+  border-bottom:1px solid var(--border-soft);
+}
+.report-row{
+  display:grid;
+  grid-template-columns:90px 1fr 100px 90px 1.4fr;
+  gap:12px;
+  padding:14px 18px;
+  align-items:center;
+  font-size:0.84rem;
+  border-bottom:1px solid var(--border-soft);
+}
+.report-row:last-child{ border-bottom:none; }
+.report-row .c-id{ font-family:var(--font-mono); color:var(--text-faint); font-size:0.78rem; }
+.report-row .c-amt{ font-family:var(--font-mono); color:var(--text-primary); }
+.report-row .c-reason{ color:var(--text-muted); font-size:0.8rem; }
+.risk-pill{
+  display:inline-block;
+  font-family:var(--font-mono); font-size:0.68rem;
+  padding:3px 9px;
+  border-radius:100px;
+  width:fit-content;
+}
+.risk-high{ background:var(--neon-red-dim); color:var(--neon-red); }
+.risk-med{ background:var(--neon-amber-dim); color:var(--neon-amber); }
+.risk-clear{ background:var(--neon-green-dim); color:var(--neon-green); }
+
+/* ---------- sidebar ---------- */
+.report-side{ display:flex; flex-direction:column; gap:16px; }
+.side-card{
+  border:1px solid var(--border-soft);
+  border-radius:var(--radius-md);
+  background:var(--bg-card);
+  padding:20px;
+}
+.side-card-title{
+  font-family:var(--font-mono); font-size:0.72rem;
+  text-transform:uppercase; letter-spacing:0.04em;
+  color:var(--neon-cyan);
+  margin-bottom:12px;
+}
+.side-card-text{ font-size:0.85rem; color:var(--text-muted); line-height:1.6; }
+.method-list{ list-style:none; display:flex; flex-direction:column; gap:12px; }
+.method-list li{
+  display:flex; align-items:center; gap:9px;
+  font-size:0.83rem; color:var(--text-muted);
+}
+.method-list .dot-red, .method-list .dot-amber{
+  width:7px; height:7px; border-radius:50%; flex-shrink:0;
+}
+.dot-red{ background:var(--neon-red); box-shadow:0 0 6px var(--neon-red); }
+.dot-amber{ background:var(--neon-amber); box-shadow:0 0 6px var(--neon-amber); }
+.method-count{
+  margin-left:auto;
+  font-family:var(--font-mono);
+  color:var(--text-faint);
+  font-size:0.78rem;
+}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+@media (max-width: 800px){
+  .summary-cards{ grid-template-columns:repeat(2,1fr); }
+  .report-body{ grid-template-columns:1fr; }
+  .report-table-head{ display:none; }
+  .report-row{
+    grid-template-columns:1fr;
+    gap:6px;
+    padding:16px 18px;
+  }
+}

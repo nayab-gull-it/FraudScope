@@ -8,6 +8,11 @@ def home():
     return render_template("index.html")
 
 
+@app.route("/scan")
+def scan():
+    return render_template("scan.html")
+
+
 if __name__ == "__main__":
     # Local dev server. Run with: py app.py
     app.run(debug=True, port=5000)

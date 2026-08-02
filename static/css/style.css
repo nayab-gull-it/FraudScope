@@ -35,6 +35,23 @@
 
 *{ box-sizing:border-box; margin:0; padding:0; }
 
+/* CRITICAL: any element with [hidden] must actually be hidden, even if
+   another rule later sets it a display value (e.g. display:flex for a
+   loading state). Without this, [hidden] gets silently overridden. */
+[hidden]{ display:none !important; }
+
+/* Reset native <button> styling so our .btn classes are the only source
+   of truth — browsers apply their own background/border/font to
+   <button> by default, which was making btn-ghost text invisible. */
+button{
+  font-family:inherit;
+  font-size:inherit;
+  background:none;
+  border:none;
+  cursor:pointer;
+  color:inherit;
+}
+
 html{ scroll-behavior:smooth; }
 
 body{
@@ -92,6 +109,8 @@ a{ color:inherit; text-decoration:none; }
 .nav-links a{ transition:color 0.2s ease; }
 .nav-links a:hover{ color:var(--text-primary); }
 .nav-cta{
+  position:relative;
+  display:inline-flex; align-items:center; gap:6px;
   padding:9px 18px;
   border:1px solid var(--neon-cyan);
   border-radius:100px;
@@ -99,6 +118,40 @@ a{ color:inherit; text-decoration:none; }
   font-weight:500;
 }
 .nav-cta:hover{ background:var(--neon-cyan-dim); }
+.nav-cta::after{
+  content:'';
+  position:absolute; inset:-4px;
+  border:1px solid var(--neon-cyan);
+  border-radius:100px;
+  opacity:0.6;
+  animation:ctaPulse 2s ease-out infinite;
+  pointer-events:none;
+}
+@keyframes ctaPulse{
+  0%{ opacity:0.6; transform:scale(1); }
+  100%{ opacity:0; transform:scale(1.35); }
+}
+.cta-arrow{
+  display:inline-block;
+  animation:ctaArrowBounce 1.2s ease-in-out infinite;
+}
+@keyframes ctaArrowBounce{
+  0%,100%{ transform:translateX(0); }
+  50%{ transform:translateX(4px); }
+}
+
+.demo-badge{
+  font-family:var(--font-mono);
+  font-size:0.62rem;
+  text-transform:uppercase;
+  letter-spacing:0.04em;
+  color:var(--text-faint);
+  border:1px solid var(--border);
+  border-radius:100px;
+  padding:2px 8px;
+  margin-left:8px;
+  vertical-align:middle;
+}
 
 /* =========================================================
    HERO
