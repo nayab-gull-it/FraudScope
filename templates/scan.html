@@ -9,8 +9,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/scan.css') }}">
-</head>
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+</head>
+</head>
 <body>
 
 <!-- ============ NAV ============ -->
@@ -76,6 +77,18 @@
 
     <div class="column-confirm-list" id="columnConfirmList">
       <!-- 4 rows injected by JS -->
+    </div>
+
+    <div class="threshold-box">
+      <label for="thresholdInput" class="threshold-label">
+        Your organization's approval limit <span class="threshold-optional">(optional)</span>
+      </label>
+      <p class="threshold-hint">
+        FraudScope flags amounts sitting just under an approval limit. If you know
+        your real limit (e.g. 50000), enter it for a precise check. Leave blank to
+        check common default limits instead (10k / 25k / 50k / 100k / 500k / 1M).
+      </p>
+      <input type="number" id="thresholdInput" class="threshold-input" placeholder="e.g. 50000" min="1" step="1">
     </div>
 
     <div class="confirm-actions">
@@ -158,7 +171,7 @@
             twice within the same week.
           </p>
         </div>
-        <div class="side-card">
+       <div class="side-card">
           <p class="side-card-title">Methods that fired</p>
           <ul class="method-list">
             <li><span class="dot-red"></span> Threshold-skirting <span class="method-count">2</span></li>
@@ -166,6 +179,21 @@
             <li><span class="dot-amber"></span> Statistical outlier <span class="method-count">3</span></li>
             <li><span class="dot-amber"></span> Round-number bias <span class="method-count">2</span></li>
           </ul>
+        </div>
+
+        <div class="side-card chat-card">
+          <p class="side-card-title">Ask about this report</p>
+          <div class="chat-messages" id="chatMessages">
+            <div class="chat-msg chat-msg-bot">
+              Ask me anything about this scan — I can answer from the summary stats.
+              For row-level detail (specific vendors, amounts, IDs) I'll ask your
+              permission first.
+            </div>
+          </div>
+          <div class="chat-input-row">
+            <input type="text" id="chatInput" class="chat-input" placeholder="e.g. What's the biggest risk here?">
+            <button type="button" id="chatSendBtn" class="chat-send-btn" aria-label="Send">→</button>
+          </div>
         </div>
       </aside>
     </div>

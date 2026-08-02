@@ -1,6 +1,6 @@
 // FraudScope — scan page interactions
 // Flow: Upload -> Confirm Columns -> Analyzing -> Report
-// Both /api/detect-columns and /api/scan are real Flask endpoints.
+// /api/detect-columns, /api/scan, /api/narrative, /api/export, /api/chat are all real Flask endpoints.
 
 const uploadState = document.getElementById("uploadState");
 const confirmState = document.getElementById("confirmState");
@@ -18,6 +18,7 @@ const downloadBtn = document.getElementById("downloadBtn");
 
 const confirmFileName = document.getElementById("confirmFileName");
 const columnConfirmList = document.getElementById("columnConfirmList");
+const thresholdInput = document.getElementById("thresholdInput");
 const backToUploadBtn = document.getElementById("backToUploadBtn");
 const continueScanBtn = document.getElementById("continueScanBtn");
 
@@ -48,6 +49,11 @@ const CONFIDENCE_META = {
 
 let currentFile = null;
 let allColumnsCache = [];
+let currentReportData = null;
+
+// Chat state — reset on every new report, since it's tied to that scan's data.
+let chatHistory = [];
+let chatConsent = false;
 
 // ---------- dropzone interactions ----------
 browseBtn.addEventListener("click", () => fileInput.click());
@@ -195,6 +201,13 @@ continueScanBtn.addEventListener("click", () => {
     return;
   }
 
+  const thresholdRaw = thresholdInput.value.trim();
+  if (thresholdRaw && (isNaN(thresholdRaw) || Number(thresholdRaw) <= 0)) {
+    alert("Approval limit must be a positive number, or leave it blank.");
+    return;
+  }
+  mapping.customThreshold = thresholdRaw || null;
+
   startAnalysis(currentFile, mapping);
 });
 
@@ -202,6 +215,7 @@ function resetToUpload() {
   currentFile = null;
   fileNameEl.textContent = "";
   fileInput.value = "";
+  thresholdInput.value = "";
   showState(uploadState);
 }
 
@@ -246,6 +260,7 @@ async function runScan(file, mapping) {
   formData.append("date_col", mapping.date || "");
   formData.append("id_col", mapping.id || "");
   formData.append("vendor_col", mapping.vendor || "");
+  formData.append("custom_threshold", mapping.customThreshold || "");
 
   try {
     const response = await fetch("/api/scan", {
@@ -279,6 +294,11 @@ async function runScan(file, mapping) {
 
 // ---------- report rendering ----------
 function renderReport(data) {
+  currentReportData = data;
+  chatHistory = [];
+  chatConsent = false;
+  resetChatUI();
+
   document.getElementById("reportFileName").textContent = data.filename || "Report";
 
   renderSummaryCards(data);
@@ -361,7 +381,12 @@ function renderMethodList(methodCounts) {
   }).join("");
 }
 
-function renderAiSummary(data) {
+// =========================================================
+// AI Narrative summary — real /api/narrative call.
+// Only ever sends aggregated stats (never raw rows), and is skipped
+// entirely if Offline Mode is on, matching the backend's own guardrail.
+// =========================================================
+async function renderAiSummary(data) {
   const el = document.getElementById("aiSummaryText");
   if (!el) return;
 
@@ -377,35 +402,32 @@ function renderAiSummary(data) {
     return;
   }
 
-  el.textContent = buildLocalSummary(data);
-}
+  el.textContent = "Generating summary…";
 
-// Placeholder local summary generator. Real Groq-based narrative comes
-// in a later step — this stays honest about that instead of pretending
-// to be an AI summary.
-function buildLocalSummary(data) {
-  const high = data.high_risk ?? 0;
-  const med = data.medium_risk ?? 0;
-  const total = data.total_rows ?? 0;
+  const summary = {
+    total_rows: data.total_rows ?? 0,
+    high_risk: data.high_risk ?? 0,
+    medium_risk: data.medium_risk ?? 0,
+    clear: data.clear ?? 0,
+    method_counts: data.method_counts ?? {},
+  };
 
-  if (high === 0 && med === 0) {
-    return `All ${total} rows came back clear — no anomalies detected in this file.`;
+  try {
+    const response = await fetch("/api/narrative", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ offline_mode: false, summary }),
+    });
+    const result = await response.json();
+
+    if (result.narrative) {
+      el.textContent = result.narrative;
+    } else {
+      el.textContent = result.error || "AI summary is currently unavailable.";
+    }
+  } catch (err) {
+    el.textContent = "Couldn't reach the AI summary service. Please try again.";
   }
-
-  const topMethod = Object.entries(data.method_counts || {})
-    .sort(([, a], [, b]) => b - a)[0];
-
-  let sentence = `${high} of ${total} transactions were flagged high risk`;
-  if (med > 0) sentence += ` and ${med} medium risk`;
-  sentence += ".";
-
-  if (topMethod) {
-    const meta = METHOD_META[topMethod[0]] || { label: prettifyKey(topMethod[0]) };
-    sentence += ` The most common signal was ${meta.label.toLowerCase()} (${topMethod[1]} rows).`;
-  }
-
-  sentence += " (Local summary — AI-generated narrative is coming in a later step.)";
-  return sentence;
 }
 
 function prettifyKey(key) {
@@ -440,6 +462,169 @@ newScanBtn.addEventListener("click", () => {
   resetToUpload();
 });
 
-downloadBtn.addEventListener("click", () => {
-  alert("Report export will be wired up in a later step (PDF/report export).");
+downloadBtn.addEventListener("click", async () => {
+  if (!currentReportData) {
+    alert("No report to export yet — scan a file first.");
+    return;
+  }
+
+  const originalText = downloadBtn.textContent;
+  downloadBtn.disabled = true;
+  downloadBtn.textContent = "Generating PDF…";
+
+  try {
+    const response = await fetch("/api/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(currentReportData),
+    });
+
+    if (!response.ok) {
+      throw new Error("Couldn't generate the PDF. Please try again.");
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "fraudscope_report.pdf";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    alert(err.message || "Couldn't reach the server. Please try again.");
+  } finally {
+    downloadBtn.disabled = false;
+    downloadBtn.textContent = originalText;
+  }
+});
+
+// =========================================================
+// Chat widget — consent-aware, wired to /api/chat
+// =========================================================
+const chatMessages = document.getElementById("chatMessages");
+const chatInput = document.getElementById("chatInput");
+const chatSendBtn = document.getElementById("chatSendBtn");
+
+function resetChatUI() {
+  if (!chatMessages) return;
+  chatMessages.innerHTML = `
+    <div class="chat-msg chat-msg-bot">
+      Ask me anything about this scan — I can answer from the summary stats.
+      For row-level detail (specific vendors, amounts, IDs) I'll ask your
+      permission first.
+    </div>
+  `;
+}
+
+function appendChatMsg(text, cls) {
+  const div = document.createElement("div");
+  div.className = `chat-msg ${cls}`;
+  div.textContent = text;
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return div;
+}
+
+function appendConsentPrompt(pendingQuestion) {
+  const wrap = document.createElement("div");
+  wrap.className = "chat-msg chat-msg-bot";
+  wrap.textContent = "";
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "chat-consent-btn";
+  btn.textContent = "Allow access to answer this";
+  btn.addEventListener("click", () => {
+    chatConsent = true;
+    btn.disabled = true;
+    btn.textContent = "Access allowed ✓";
+    sendChatMessage(pendingQuestion, true);
+  });
+
+  wrap.appendChild(document.createTextNode("I don't have access to your transaction data for that. "));
+  wrap.appendChild(document.createElement("br"));
+  wrap.appendChild(btn);
+  chatMessages.appendChild(wrap);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+async function sendChatMessage(message, isRetry = false) {
+  if (!currentReportData) return;
+
+  const offline = offlineToggle.classList.contains("toggle-on");
+  if (offline) {
+    appendChatMsg("Offline mode is on — the chatbot is disabled while it's active.", "chat-msg-error");
+    return;
+  }
+
+  if (!isRetry) {
+    appendChatMsg(message, "chat-msg-user");
+  }
+
+  chatInput.disabled = true;
+  chatSendBtn.disabled = true;
+  const typingEl = appendChatMsg("Thinking…", "chat-msg-typing");
+
+  const summary = {
+    total_rows: currentReportData.total_rows ?? 0,
+    high_risk: currentReportData.high_risk ?? 0,
+    medium_risk: currentReportData.medium_risk ?? 0,
+    clear: currentReportData.clear ?? 0,
+    method_counts: currentReportData.method_counts ?? {},
+  };
+
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message,
+        history: chatHistory,
+        summary,
+        rows: chatConsent ? (currentReportData.rows ?? []) : [],
+        consent: chatConsent,
+        offline_mode: false,
+      }),
+    });
+    const result = await response.json();
+    typingEl.remove();
+
+    if (result.error) {
+      appendChatMsg(result.error, "chat-msg-error");
+      return;
+    }
+
+    if (result.needs_data_access) {
+      appendConsentPrompt(message);
+      // Don't add this exchange to history — we're about to retry it with consent.
+      return;
+    }
+
+    appendChatMsg(result.answer, "chat-msg-bot");
+    chatHistory.push({ role: "user", content: message });
+    chatHistory.push({ role: "assistant", content: result.answer });
+  } catch (err) {
+    typingEl.remove();
+    appendChatMsg("Couldn't reach the chat service. Please try again.", "chat-msg-error");
+  } finally {
+    chatInput.disabled = false;
+    chatSendBtn.disabled = false;
+    chatInput.focus();
+  }
+}
+
+chatSendBtn.addEventListener("click", () => {
+  const message = chatInput.value.trim();
+  if (!message) return;
+  chatInput.value = "";
+  sendChatMessage(message);
+});
+
+chatInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    chatSendBtn.click();
+  }
 });

@@ -4,3 +4,4 @@ numpy==1.26.4
 groq
 python-dotenv
 reportlab
+pandas-stubs
