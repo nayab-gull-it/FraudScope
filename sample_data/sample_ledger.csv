@@ -1,0 +1,21 @@
+transaction_id,date,vendor,amount
+TXN-1001,2026-01-05,Nimbus Logistics,48900
+TXN-1002,2026-01-06,Aster Supplies,12050
+TXN-1003,2026-01-06,Aster Supplies,12050
+TXN-1004,2026-01-07,Rehman & Co,50000
+TXN-1005,2026-01-08,Vellum Traders,49975
+TXN-1006,2026-01-09,Nimbus Logistics,9400
+TXN-1007,2026-01-10,Kestrel Freight,150000
+TXN-1008,2026-01-11,Aster Supplies,49988
+TXN-1009,2026-01-12,Horizon Metals,7300
+TXN-1010,2026-01-13,Nimbus Logistics,11200
+TXN-1011,2026-01-14,Rehman & Co,15600
+TXN-1012,2026-01-15,Vellum Traders,8900
+TXN-1013,2026-01-16,Horizon Metals,99500
+TXN-1014,2026-01-17,Kestrel Freight,6200
+TXN-1015,2026-01-18,Aster Supplies,13400
+TXN-1016,2026-01-19,Nimbus Logistics,10200
+TXN-1017,2026-01-19,Nimbus Logistics,10200
+TXN-1018,2026-01-20,Rehman & Co,24950
+TXN-1019,2026-01-21,Vellum Traders,7100
+TXN-1020,2026-01-22,Horizon Metals,9800

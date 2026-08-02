@@ -1,6 +1,5 @@
 // FraudScope — scan page interactions
-// Currently simulates the pipeline with dummy data.
-// Step 3 will swap simulateAnalysis() for a real fetch() to the Flask backend.
+// Step 4: wired to the real /api/scan Flask endpoint. No more dummy data.
 
 const uploadState = document.getElementById("uploadState");
 const analyzingState = document.getElementById("analyzingState");
@@ -15,16 +14,16 @@ const analyzingSub = document.getElementById("analyzingSub");
 const newScanBtn = document.getElementById("newScanBtn");
 const downloadBtn = document.getElementById("downloadBtn");
 
-const DEMO_REPORT_ROWS = [
-  { id: "TXN-4471", vendor: "Nimbus Logistics", amt: "48,900",  risk: "clear", reason: "—" },
-  { id: "TXN-4472", vendor: "Aster Supplies",    amt: "12,050",  risk: "med",   reason: "Duplicate of TXN-4473, same vendor within 3 days" },
-  { id: "TXN-4473", vendor: "Aster Supplies",    amt: "12,050",  risk: "med",   reason: "Duplicate of TXN-4472, same vendor within 3 days" },
-  { id: "TXN-4474", vendor: "Rehman & Co",       amt: "50,000",  risk: "clear", reason: "—" },
-  { id: "TXN-4475", vendor: "Vellum Traders",    amt: "49,975",  risk: "high",  reason: "Sits $25 under the 50,000 approval threshold" },
-  { id: "TXN-4476", vendor: "Nimbus Logistics",  amt: "9,400",   risk: "clear", reason: "—" },
-  { id: "TXN-4477", vendor: "Kestrel Freight",   amt: "150,000", risk: "high",  reason: "4.2x above account's typical transaction size" },
-  { id: "TXN-4478", vendor: "Aster Supplies",    amt: "49,988",  risk: "high",  reason: "Sits $12 under the 50,000 approval threshold" },
-];
+// Human-readable labels + risk-dot color for each detection method.
+// Backend may send any subset of these keys in method_counts.
+const METHOD_META = {
+  outlier:              { label: "Statistical outlier",   dot: "dot-red"   },
+  threshold_skirt:      { label: "Threshold-skirting",    dot: "dot-red"   },
+  duplicate:            { label: "Duplicate detection",   dot: "dot-amber" },
+  round_number:         { label: "Round-number bias",     dot: "dot-amber" },
+  time_anomaly:         { label: "Time-based anomaly",    dot: "dot-amber" },
+  vendor_concentration: { label: "Vendor concentration",  dot: "dot-amber" },
+};
 
 // ---------- dropzone interactions ----------
 browseBtn.addEventListener("click", () => fileInput.click());
@@ -55,7 +54,7 @@ fileInput.addEventListener("change", (e) => {
 
 function handleFile(file) {
   fileNameEl.textContent = file.name;
-  setTimeout(() => startAnalysis(file.name), 350);
+  setTimeout(() => startAnalysis(file), 350);
 }
 
 // ---------- toggles ----------
@@ -87,49 +86,127 @@ function showState(state) {
   state.hidden = false;
 }
 
-let analysisInterval = null;
+let stepInterval = null;
 
-function startAnalysis(filename) {
-  if (analysisInterval) clearInterval(analysisInterval);
+const ANALYZING_STEPS = [
+  "Reading file…",
+  "Detecting columns…",
+  "Running statistical checks…",
+  "Scanning for duplicates…",
+  "Checking approval thresholds…",
+  "Compiling report…",
+];
+
+function startAnalysis(file) {
+  if (stepInterval) clearInterval(stepInterval);
 
   showState(analyzingState);
-  analyzingSub.textContent = filename;
+  analyzingSub.textContent = file.name;
 
-  const steps = [
-    "Reading file…",
-    "Detecting columns…",
-    "Running Benford's Law check…",
-    "Scanning for duplicates…",
-    "Checking approval thresholds…",
-    "Compiling report…",
-  ];
   let i = 0;
-  analyzingTitle.textContent = steps[0];
-  analysisInterval = setInterval(() => {
-    i++;
-    if (i < steps.length) {
-      analyzingTitle.textContent = steps[i];
-    } else {
-      clearInterval(analysisInterval);
-      analysisInterval = null;
-      renderReport(filename);
-      showState(reportState);
+  analyzingTitle.textContent = ANALYZING_STEPS[0];
+  // Cycle through step labels while the real request is in flight.
+  // We stop one step short of the end and hold there until the
+  // response actually comes back, so it never claims to be "done"
+  // before the backend really is.
+  stepInterval = setInterval(() => {
+    if (i < ANALYZING_STEPS.length - 1) {
+      i++;
+      analyzingTitle.textContent = ANALYZING_STEPS[i];
     }
-  }, 480);
+  }, 420);
+
+  runScan(file);
+}
+
+async function runScan(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    const response = await fetch("/api/scan", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Something went wrong while scanning this file.");
+    }
+
+    if (stepInterval) {
+      clearInterval(stepInterval);
+      stepInterval = null;
+    }
+    analyzingTitle.textContent = "Compiling report…";
+
+    renderReport(data);
+    showState(reportState);
+  } catch (err) {
+    if (stepInterval) {
+      clearInterval(stepInterval);
+      stepInterval = null;
+    }
+    alert(err.message || "Couldn't reach the server. Please try again.");
+    fileNameEl.textContent = "";
+    fileInput.value = "";
+    showState(uploadState);
+  }
 }
 
 // ---------- report rendering ----------
-function renderReport(filename) {
-  document.getElementById("reportFileName").textContent = filename;
+function renderReport(data) {
+  document.getElementById("reportFileName").textContent = data.filename || "Report";
+
+  renderSummaryCards(data);
+  renderTable(data.rows || []);
+  renderFilterTabs(data);
+  renderMethodList(data.method_counts || {});
+  renderAiSummary(data);
+
+  applyFilter("all");
+}
+
+function renderSummaryCards(data) {
+  const cards = document.querySelectorAll(".summary-card .summary-num");
+  // Order in the DOM: total, high, medium, clear
+  cards[0].textContent = data.total_rows ?? 0;
+  cards[1].textContent = data.high_risk ?? 0;
+  cards[2].textContent = data.medium_risk ?? 0;
+  cards[3].textContent = data.clear ?? 0;
+}
+
+function renderFilterTabs(data) {
+  const total = data.total_rows ?? 0;
+  const high = data.high_risk ?? 0;
+  const med = data.medium_risk ?? 0;
+
+  const tabs = document.querySelectorAll(".filter-tab");
+  tabs.forEach(tab => {
+    const countEl = tab.querySelector("span");
+    if (tab.dataset.filter === "all") countEl.textContent = total;
+    if (tab.dataset.filter === "high") countEl.textContent = high;
+    if (tab.dataset.filter === "med") countEl.textContent = med;
+  });
+}
+
+function riskLabel(risk) {
+  if (risk === "high") return "high";
+  if (risk === "med") return "medium";
+  return "clear";
+}
+
+function renderTable(rows) {
   const table = document.getElementById("reportTable");
 
-  const rowsHtml = DEMO_REPORT_ROWS.map(r => `
+  const rowsHtml = rows.map(r => `
     <div class="report-row" data-risk="${r.risk}">
-      <span class="c-id">${r.id}</span>
-      <span class="c-vendor">${r.vendor}</span>
-      <span class="c-amt">${r.amt}</span>
-      <span class="risk-pill risk-${r.risk}">${r.risk === "clear" ? "clear" : r.risk === "med" ? "medium" : "high"}</span>
-      <span class="c-reason">${r.reason}</span>
+      <span class="c-id">${escapeHtml(r.id)}</span>
+      <span class="c-vendor">${escapeHtml(r.vendor)}</span>
+      <span class="c-amt">${escapeHtml(String(r.amount))}</span>
+      <span class="risk-pill risk-${r.risk}">${riskLabel(r.risk)}</span>
+      <span class="c-reason">${escapeHtml(r.reason || "—")}</span>
     </div>
   `).join("");
 
@@ -137,9 +214,86 @@ function renderReport(filename) {
     <div class="report-table-head">
       <span>ID</span><span>Vendor</span><span>Amount</span><span>Risk</span><span>Why it's flagged</span>
     </div>
-    ${rowsHtml}
+    ${rowsHtml || `<div class="report-row"><span class="c-reason">No rows to show.</span></div>`}
   `;
-  applyFilter("all");
+}
+
+function renderMethodList(methodCounts) {
+  const list = document.querySelector(".method-list");
+  if (!list) return;
+
+  const entries = Object.entries(methodCounts)
+    .filter(([, count]) => count > 0)
+    .sort(([, a], [, b]) => b - a);
+
+  if (entries.length === 0) {
+    list.innerHTML = `<li><span class="method-count">No anomaly methods fired on this file.</span></li>`;
+    return;
+  }
+
+  list.innerHTML = entries.map(([key, count]) => {
+    const meta = METHOD_META[key] || { label: prettifyKey(key), dot: "dot-amber" };
+    return `
+      <li><span class="${meta.dot}"></span> ${meta.label} <span class="method-count">${count}</span></li>
+    `;
+  }).join("");
+}
+
+function renderAiSummary(data) {
+  const el = document.getElementById("aiSummaryText");
+  if (!el) return;
+
+  const offline = offlineToggle.classList.contains("toggle-on");
+  const aiOn = aiToggle.classList.contains("toggle-on");
+
+  if (offline) {
+    el.textContent = "Offline mode is on — no summary was generated, not even locally.";
+    return;
+  }
+  if (!aiOn) {
+    el.textContent = "AI narrative summary is turned off for this scan.";
+    return;
+  }
+
+  el.textContent = buildLocalSummary(data);
+}
+
+// Placeholder local summary generator. Real Groq-based narrative comes
+// in a later step — this stays honest about that instead of pretending
+// to be an AI summary.
+function buildLocalSummary(data) {
+  const high = data.high_risk ?? 0;
+  const med = data.medium_risk ?? 0;
+  const total = data.total_rows ?? 0;
+
+  if (high === 0 && med === 0) {
+    return `All ${total} rows came back clear — no anomalies detected in this file.`;
+  }
+
+  const topMethod = Object.entries(data.method_counts || {})
+    .sort(([, a], [, b]) => b - a)[0];
+
+  let sentence = `${high} of ${total} transactions were flagged high risk`;
+  if (med > 0) sentence += ` and ${med} medium risk`;
+  sentence += ".";
+
+  if (topMethod) {
+    const meta = METHOD_META[topMethod[0]] || { label: prettifyKey(topMethod[0]) };
+    sentence += ` The most common signal was ${meta.label.toLowerCase()} (${topMethod[1]} rows).`;
+  }
+
+  sentence += " (Local summary — AI-generated narrative is coming in a later step.)";
+  return sentence;
+}
+
+function prettifyKey(key) {
+  return key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str ?? "";
+  return div.innerHTML;
 }
 
 function applyFilter(filter) {
@@ -167,5 +321,5 @@ newScanBtn.addEventListener("click", () => {
 });
 
 downloadBtn.addEventListener("click", () => {
-  alert("Report export will be wired up once the real detection engine is connected (Step 4).");
+  alert("Report export will be wired up in a later step (PDF/report export).");
 });
