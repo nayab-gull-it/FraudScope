@@ -1,7 +1,9 @@
 // FraudScope — scan page interactions
-// Step 4: wired to the real /api/scan Flask endpoint. No more dummy data.
+// Flow: Upload -> Confirm Columns -> Analyzing -> Report
+// Both /api/detect-columns and /api/scan are real Flask endpoints.
 
 const uploadState = document.getElementById("uploadState");
+const confirmState = document.getElementById("confirmState");
 const analyzingState = document.getElementById("analyzingState");
 const reportState = document.getElementById("reportState");
 
@@ -14,6 +16,11 @@ const analyzingSub = document.getElementById("analyzingSub");
 const newScanBtn = document.getElementById("newScanBtn");
 const downloadBtn = document.getElementById("downloadBtn");
 
+const confirmFileName = document.getElementById("confirmFileName");
+const columnConfirmList = document.getElementById("columnConfirmList");
+const backToUploadBtn = document.getElementById("backToUploadBtn");
+const continueScanBtn = document.getElementById("continueScanBtn");
+
 // Human-readable labels + risk-dot color for each detection method.
 // Backend may send any subset of these keys in method_counts.
 const METHOD_META = {
@@ -24,6 +31,23 @@ const METHOD_META = {
   time_anomaly:         { label: "Time-based anomaly",    dot: "dot-amber" },
   vendor_concentration: { label: "Vendor concentration",  dot: "dot-amber" },
 };
+
+// Fields shown on the Confirm Columns screen, in display order.
+const CONFIRM_FIELDS = [
+  { key: "amount", label: "Amount", hint: "Required — the transaction value", required: true },
+  { key: "date",   label: "Date",   hint: "Optional — used for weekend / off-hours checks", required: false },
+  { key: "id",     label: "ID",     hint: "Optional — falls back to row number if left blank", required: false },
+  { key: "vendor", label: "Vendor / Party", hint: "Optional — groups duplicate & concentration checks", required: false },
+];
+
+const CONFIDENCE_META = {
+  detected: { text: "Detected", badge: "badge-detected" },
+  guessed:  { text: "Best guess — check this", badge: "badge-guessed" },
+  none:     { text: "Not found — please select", badge: "badge-none" },
+};
+
+let currentFile = null;
+let allColumnsCache = [];
 
 // ---------- dropzone interactions ----------
 browseBtn.addEventListener("click", () => fileInput.click());
@@ -53,8 +77,9 @@ fileInput.addEventListener("change", (e) => {
 });
 
 function handleFile(file) {
+  currentFile = file;
   fileNameEl.textContent = file.name;
-  setTimeout(() => startAnalysis(file), 350);
+  setTimeout(() => detectColumnsStep(file), 300);
 }
 
 // ---------- toggles ----------
@@ -82,46 +107,145 @@ aiToggle.addEventListener("click", () => {
 
 // ---------- state transitions ----------
 function showState(state) {
-  [uploadState, analyzingState, reportState].forEach(s => s.hidden = true);
+  [uploadState, confirmState, analyzingState, reportState].forEach(s => s.hidden = true);
   state.hidden = false;
 }
 
+// =========================================================
+// STEP 1: detect columns (quick server round-trip)
+// =========================================================
+async function detectColumnsStep(file) {
+  showState(analyzingState);
+  analyzingTitle.textContent = "Reading column headers…";
+  analyzingSub.textContent = file.name;
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    const response = await fetch("/api/detect-columns", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Couldn't read this file's columns.");
+    }
+
+    buildConfirmState(file, data);
+    showState(confirmState);
+  } catch (err) {
+    alert(err.message || "Couldn't reach the server. Please try again.");
+    resetToUpload();
+  }
+}
+
+function buildConfirmState(file, data) {
+  confirmFileName.textContent = file.name;
+  allColumnsCache = data.all_columns || [];
+
+  columnConfirmList.innerHTML = CONFIRM_FIELDS.map(field => {
+    const detectedCol = data.columns_detected?.[field.key] || "";
+    const confidenceKey = data.confidence?.[field.key] || "none";
+    const conf = CONFIDENCE_META[confidenceKey] || CONFIDENCE_META.none;
+
+    const optionsHtml = buildOptionsHtml(detectedCol, field.required);
+
+    return `
+      <div class="confirm-row">
+        <div class="confirm-row-label">
+          <span class="confirm-field-name">${field.label}</span>
+          <span class="confirm-field-hint">${field.hint}</span>
+        </div>
+        <select class="confirm-select" data-field="${field.key}">
+          ${optionsHtml}
+        </select>
+        <span class="confidence-badge ${conf.badge}">${conf.text}</span>
+      </div>
+    `;
+  }).join("");
+}
+
+function buildOptionsHtml(selectedCol, required) {
+  const opts = [];
+  if (!required) {
+    opts.push(`<option value=""${selectedCol ? "" : " selected"}>— none —</option>`);
+  }
+  allColumnsCache.forEach(col => {
+    const selected = col.name === selectedCol ? " selected" : "";
+    const safeName = escapeHtml(col.name);
+    opts.push(`<option value="${safeName}"${selected}>${safeName} (${col.dtype})</option>`);
+  });
+  return opts.join("");
+}
+
+backToUploadBtn.addEventListener("click", () => {
+  resetToUpload();
+});
+
+continueScanBtn.addEventListener("click", () => {
+  const mapping = {};
+  document.querySelectorAll(".confirm-select").forEach(sel => {
+    mapping[sel.dataset.field] = sel.value;
+  });
+
+  if (!mapping.amount) {
+    alert("Please choose which column holds the transaction amount.");
+    return;
+  }
+
+  startAnalysis(currentFile, mapping);
+});
+
+function resetToUpload() {
+  currentFile = null;
+  fileNameEl.textContent = "";
+  fileInput.value = "";
+  showState(uploadState);
+}
+
+// =========================================================
+// STEP 2: real scan, using the confirmed column mapping
+// =========================================================
 let stepInterval = null;
 
-const ANALYZING_STEPS = [
-  "Reading file…",
-  "Detecting columns…",
+const SCAN_STEPS = [
   "Running statistical checks…",
   "Scanning for duplicates…",
   "Checking approval thresholds…",
   "Compiling report…",
 ];
 
-function startAnalysis(file) {
+function startAnalysis(file, mapping) {
   if (stepInterval) clearInterval(stepInterval);
 
   showState(analyzingState);
   analyzingSub.textContent = file.name;
 
   let i = 0;
-  analyzingTitle.textContent = ANALYZING_STEPS[0];
+  analyzingTitle.textContent = SCAN_STEPS[0];
   // Cycle through step labels while the real request is in flight.
   // We stop one step short of the end and hold there until the
   // response actually comes back, so it never claims to be "done"
   // before the backend really is.
   stepInterval = setInterval(() => {
-    if (i < ANALYZING_STEPS.length - 1) {
+    if (i < SCAN_STEPS.length - 1) {
       i++;
-      analyzingTitle.textContent = ANALYZING_STEPS[i];
+      analyzingTitle.textContent = SCAN_STEPS[i];
     }
   }, 420);
 
-  runScan(file);
+  runScan(file, mapping);
 }
 
-async function runScan(file) {
+async function runScan(file, mapping) {
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("amount_col", mapping.amount || "");
+  formData.append("date_col", mapping.date || "");
+  formData.append("id_col", mapping.id || "");
+  formData.append("vendor_col", mapping.vendor || "");
 
   try {
     const response = await fetch("/api/scan", {
@@ -149,9 +273,7 @@ async function runScan(file) {
       stepInterval = null;
     }
     alert(err.message || "Couldn't reach the server. Please try again.");
-    fileNameEl.textContent = "";
-    fileInput.value = "";
-    showState(uploadState);
+    resetToUpload();
   }
 }
 
@@ -315,9 +437,7 @@ document.addEventListener("click", (e) => {
 
 // ---------- reset / download ----------
 newScanBtn.addEventListener("click", () => {
-  fileNameEl.textContent = "";
-  fileInput.value = "";
-  showState(uploadState);
+  resetToUpload();
 });
 
 downloadBtn.addEventListener("click", () => {

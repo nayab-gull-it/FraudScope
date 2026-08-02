@@ -64,7 +64,26 @@
     </div>
   </section>
 
-  <!-- ============ STATE 2: ANALYZING ============ -->
+  <!-- ============ STATE 2: CONFIRM COLUMNS ============ -->
+  <section class="confirm-state" id="confirmState" hidden>
+    <p class="section-eyebrow" style="text-align:center">Before we scan</p>
+    <h1 class="scan-title">Did we read your columns right?</h1>
+    <p class="hero-sub" style="margin:0 auto 32px; text-align:center">
+      FraudScope guesses which column means what from your file's headers.
+      Fix anything that looks wrong — <span id="confirmFileName"></span>
+    </p>
+
+    <div class="column-confirm-list" id="columnConfirmList">
+      <!-- 4 rows injected by JS -->
+    </div>
+
+    <div class="confirm-actions">
+      <button class="btn btn-ghost" id="backToUploadBtn" type="button">← Back</button>
+      <button class="btn btn-primary" id="continueScanBtn" type="button">Looks good — scan it</button>
+    </div>
+  </section>
+
+  <!-- ============ STATE 3: ANALYZING ============ -->
   <section class="analyzing-state" id="analyzingState" hidden>
     <div class="analyzing-panel">
       <div class="analyzing-ring"></div>
@@ -73,7 +92,7 @@
     </div>
   </section>
 
-  <!-- ============ STATE 3: REPORT ============ -->
+  <!-- ============ STATE 4: REPORT ============ -->
   <section class="report-state" id="reportState" hidden>
 
     <div class="report-header">

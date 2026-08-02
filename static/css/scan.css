@@ -1,5 +1,5 @@
 /* =========================================================
-   FraudScope — Scan page (upload, analyzing, report states)
+   FraudScope — Scan page (upload, confirm, analyzing, report states)
    Relies on design tokens defined in style.css
    ========================================================= */
 
@@ -74,7 +74,93 @@
 }
 
 /* =========================================================
-   STATE 2 — ANALYZING
+   STATE 2 — CONFIRM COLUMNS
+   ========================================================= */
+.confirm-state{ max-width:680px; margin:0 auto; }
+
+#confirmFileName{
+  font-family:var(--font-mono);
+  color:var(--neon-green);
+  font-size:0.85rem;
+}
+
+.column-confirm-list{
+  display:flex; flex-direction:column; gap:12px;
+  border:1px solid var(--border-soft);
+  border-radius:var(--radius-md);
+  background:var(--bg-card);
+  padding:8px 22px;
+}
+
+.confirm-row{
+  display:grid;
+  grid-template-columns:1fr 1.4fr auto;
+  align-items:center;
+  gap:16px;
+  padding:16px 0;
+  border-bottom:1px solid var(--border-soft);
+}
+.confirm-row:last-child{ border-bottom:none; }
+
+.confirm-field-name{
+  display:block;
+  font-weight:500;
+  font-size:0.92rem;
+  color:var(--text-primary);
+}
+.confirm-field-hint{
+  display:block;
+  font-size:0.76rem;
+  color:var(--text-faint);
+  margin-top:2px;
+}
+
+.confirm-select{
+  width:100%;
+  font-family:var(--font-mono);
+  font-size:0.82rem;
+  color:var(--text-primary);
+  background:var(--bg-card-hover);
+  border:1px solid var(--border-soft);
+  border-radius:var(--radius-sm, 6px);
+  padding:9px 10px;
+  cursor:pointer;
+  transition:border-color 0.2s ease;
+}
+.confirm-select:hover, .confirm-select:focus{
+  border-color:var(--neon-cyan);
+  outline:none;
+}
+
+.confidence-badge{
+  font-family:var(--font-mono);
+  font-size:0.68rem;
+  text-transform:uppercase;
+  letter-spacing:0.03em;
+  padding:4px 9px;
+  border-radius:100px;
+  white-space:nowrap;
+  justify-self:end;
+}
+.badge-detected{ background:var(--neon-green-dim); color:var(--neon-green); }
+.badge-guessed{  background:var(--neon-amber-dim); color:var(--neon-amber); }
+.badge-none{     background:var(--neon-red-dim);   color:var(--neon-red); }
+
+.confirm-actions{
+  display:flex; justify-content:space-between;
+  margin-top:24px;
+}
+
+@media (max-width: 620px){
+  .confirm-row{
+    grid-template-columns:1fr;
+    gap:8px;
+  }
+  .confidence-badge{ justify-self:start; }
+}
+
+/* =========================================================
+   STATE 3 — ANALYZING
    ========================================================= */
 .analyzing-state{
   display:flex; align-items:center; justify-content:center;
@@ -102,7 +188,7 @@
 }
 
 /* =========================================================
-   STATE 3 — REPORT
+   STATE 4 — REPORT
    ========================================================= */
 .report-state{ max-width:1080px; margin:0 auto; }
 

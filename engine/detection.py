@@ -33,8 +33,20 @@ COMMON_THRESHOLDS = (10_000, 25_000, 50_000, 100_000, 500_000, 1_000_000)
 # Column detection
 # =========================================================
 def detect_columns(df: pd.DataFrame) -> dict:
-    """Guess which column is amount / date / id / vendor from name + dtype."""
+    """Guess which column is amount / date / id / vendor from name + dtype.
+
+    This is a heuristic, not a domain-aware understanding of the file —
+    it matches header text against keyword lists and falls back to dtype
+    when nothing matches. Returns both the guess and how confident that
+    guess is, so the frontend can ask the user to confirm anything that
+    wasn't a clean keyword match:
+
+      "detected" -> a header keyword matched, reasonably safe
+      "guessed"  -> no keyword matched, we fell back to a heuristic
+      "none"     -> nothing usable found at all
+    """
     columns = {"amount": None, "date": None, "id": None, "vendor": None}
+    confidence = {"amount": "none", "date": "none", "id": "none", "vendor": "none"}
     lower = {c: str(c).lower() for c in df.columns}
 
     amount_keys = ["amount", "amt", "total", "value", "price", "cost", "sum", "balance"]
@@ -45,24 +57,50 @@ def detect_columns(df: pd.DataFrame) -> dict:
     for col, low in lower.items():
         if columns["amount"] is None and any(k in low for k in amount_keys) and pd.api.types.is_numeric_dtype(df[col]):
             columns["amount"] = col
+            confidence["amount"] = "detected"
         elif columns["date"] is None and any(k in low for k in date_keys):
             columns["date"] = col
+            confidence["date"] = "detected"
         elif columns["id"] is None and any(k in low for k in id_keys):
             columns["id"] = col
+            confidence["id"] = "detected"
         elif columns["vendor"] is None and any(k in low for k in vendor_keys):
             columns["vendor"] = col
+            confidence["vendor"] = "detected"
 
     # fallback: first numeric column becomes the amount column
     if columns["amount"] is None:
         numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
         if numeric_cols:
             columns["amount"] = numeric_cols[0]
+            confidence["amount"] = "guessed"
 
     # fallback: first column becomes the id column
     if columns["id"] is None:
         columns["id"] = df.columns[0]
+        confidence["id"] = "guessed"
 
-    return columns
+    return {"columns": columns, "confidence": confidence}
+
+
+def describe_columns(df: pd.DataFrame) -> list[dict]:
+    """Lightweight per-column type hints, used to populate the
+    column-confirmation dropdowns on the frontend (so a user picking a
+    replacement column can see at a glance whether it's numeric/date/text)."""
+    described = []
+    for col in df.columns:
+        if pd.api.types.is_numeric_dtype(df[col]):
+            dtype = "numeric"
+        else:
+            sample = df[col].dropna().astype(str).head(20)
+            if len(sample) > 0:
+                parsed = pd.to_datetime(sample, errors="coerce")
+                looks_like_date = parsed.notna().mean() > 0.7
+            else:
+                looks_like_date = False
+            dtype = "date-like" if looks_like_date else "text"
+        described.append({"name": str(col), "dtype": dtype})
+    return described
 
 
 # =========================================================
@@ -150,8 +188,31 @@ def check_vendor_concentration(df: pd.DataFrame, amount_col: str, vendor_col: st
 # =========================================================
 # Orchestration
 # =========================================================
-def run_scan(df: pd.DataFrame) -> dict:
-    columns = detect_columns(df)
+def run_scan(df: pd.DataFrame, override_columns: dict | None = None) -> dict:
+    """Run the full detection pipeline.
+
+    override_columns, if given, is a dict like
+    {"amount": "Fee", "date": "Paid_On", "id": None, "vendor": "Student_Name"}
+    coming from the user confirming/correcting the auto-detected columns
+    on the frontend. When provided, it's used as-is instead of guessing —
+    this is what lets the same engine work correctly on a ledger whose
+    headers don't match the built-in keyword lists (e.g. a school's "Fee"
+    column, which detect_columns() has no way to recognize on its own).
+    """
+    if override_columns:
+        columns = {
+            "amount": override_columns.get("amount") or None,
+            "date":   override_columns.get("date") or None,
+            "id":     override_columns.get("id") or None,
+            "vendor": override_columns.get("vendor") or None,
+        }
+        # ignore anything that doesn't actually exist in this file
+        for key, col in list(columns.items()):
+            if col is not None and col not in df.columns:
+                columns[key] = None
+    else:
+        columns = detect_columns(df)["columns"]
+
     amount_col, date_col, id_col, vendor_col = (
         columns["amount"], columns["date"], columns["id"], columns["vendor"]
     )
